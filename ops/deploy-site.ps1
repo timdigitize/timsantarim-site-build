@@ -8,6 +8,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5'te ilerleme cubugu Invoke-WebRequest/Expand-Archive'i kat kat yavaslatir
+$ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Repo      = 'timdigitize/timsantarim-site-build'

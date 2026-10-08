@@ -33,7 +33,9 @@ function Log($msg) {
 function Get-SiteRoot {
     if (Test-Path $RootFile) { return (Get-Content $RootFile -Raw).Trim() }
     Import-Module WebAdministration
-    $sites = @(Get-Website | Where-Object { ($_.bindings.Collection | ForEach-Object { $_.bindingInformation }) -match [regex]::Escape($Domain) })
+    # Yalniz tam alan adi (timsantarim.com / www.timsantarim.com); nova./novaapi. gibi alt alan adlari ayri sitelerdir
+    $hostRx = ':(www\.)?' + [regex]::Escape($Domain) + '$'
+    $sites = @(Get-Website | Where-Object { ($_.bindings.Collection | ForEach-Object { $_.bindingInformation }) -match $hostRx })
     if ($sites.Count -ne 1) {
         $all = (Get-Website | ForEach-Object { "$($_.name) -> $($_.physicalPath)" }) -join '; '
         throw "IIS'te $Domain icin tek site bulunamadi ($($sites.Count)). Siteler: $all. Dogru yolu $RootFile dosyasina yazin."
@@ -65,12 +67,6 @@ try {
     }
     Log "Yeni surum: $sha (mevcut: $(if ($current) { $current } else { 'yok' }))"
 
-    $SiteRoot = Get-SiteRoot
-    if (-not (Test-Path (Join-Path $SiteRoot 'index.html'))) { throw "Site kokunde index.html yok: $SiteRoot - yol yanlis olabilir, $RootFile dosyasini kontrol edin" }
-    $nested = @(Get-NestedSiteDirs $SiteRoot)
-    $exclude = $KeepDirs + $nested
-    Log "Site koku: $SiteRoot$(if ($nested) { ' | haric: ' + ($nested -join ', ') })"
-
     # Betik kendini gunceller (bir sonraki calismada devreye girer)
     try {
         $selfUrl = "https://raw.githubusercontent.com/$Repo/$Branch/ops/deploy-site.ps1"
@@ -81,6 +77,12 @@ try {
             Log 'deploy-site.ps1 guncellendi (yeni surum bir sonraki calismada gecerli)'
         }
     } catch { Log "Betik guncelleme atlandi: $($_.Exception.Message)" }
+
+    $SiteRoot = Get-SiteRoot
+    if (-not (Test-Path (Join-Path $SiteRoot 'index.html'))) { throw "Site kokunde index.html yok: $SiteRoot - yol yanlis olabilir, $RootFile dosyasini kontrol edin" }
+    $nested = @(Get-NestedSiteDirs $SiteRoot)
+    $exclude = $KeepDirs + $nested
+    Log "Site koku: $SiteRoot$(if ($nested) { ' | haric: ' + ($nested -join ', ') })"
 
     # Calisma klasoru: sha + zaman damgasi (ayni surum icin es zamanli iki calisma cakismasin)
     Get-ChildItem $Ops -Directory -Filter 'work-*' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt (Get-Date).AddHours(-2) } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
